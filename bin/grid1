@@ -1,0 +1,62 @@
+#!/usr/bin/env perl
+use warnings;
+use strict;
+use XML::LibXML;
+use POSIX qw(round);
+use Math::Trig qw(pi);
+
+use FindBin;
+use lib "${FindBin::Bin}/../lib";
+use Paper qw(:all);
+
+# letter
+our $INCH = 96;
+our $width = 8.5 * $INCH;
+our $height = 11 * $INCH;
+
+my $doc = XML::LibXML::Document->new('1.0', 'UTF-8');
+my $viewbox = sprintf('%.3f %.3f %.3f %.3f', 0, 0, $width, $height);
+
+$Paper::doc = $doc;
+
+my $root = SVG(width => $width, height => $height, viewBox => $viewbox);
+$doc->setDocumentElement($root);
+
+my $x1 = $INCH / 4;
+my $y1 = $INCH / 4;
+my $x2 = $width - $INCH / 4;
+my $y2 = $height - $INCH / 4;
+
+my $style = STYLE($PAPER_STYLES);
+$root->appendChild($style);
+
+my @bounds = (x => $x1, width => $x2 - $x1, y => $y1, height => $y2 - $y1);
+
+my $clip_path = CLIP_PATH(id => 'clipPath', RECT(@bounds));
+$root->appendChild($clip_path);
+
+my $g = G(clipPath => 'url(#clipPath)');
+$root->appendChild($g);
+
+for (my $x = 0; $x <= 40; $x += 1) {
+    my $class = ($x % 10 == 0) ? 'major' : ($x % 5 == 0) ? 'minor' : 'feint';
+    my $x3 = $width / 2 - $x * $INCH / 10;
+    my $x4 = $width / 2 + $x * $INCH / 10;
+    $g->appendChild(LINE(x1 => $x3, x2 => $x3, y1 => $y1, y2 => $y2, class => "stroke-non-repro-blue $class"));
+    if ($x) {
+        $g->appendChild(LINE(x1 => $x4, x2 => $x4, y1 => $y1, y2 => $y2, class => "stroke-non-repro-blue $class"));
+    }
+}
+for (my $y = 0; $y <= 52; $y += 1) {
+    my $class = ($y % 10 == 0) ? 'major' : ($y % 5 == 0) ? 'minor' : 'feint';
+    my $y3 = $height / 2 - $y * $INCH / 10;
+    my $y4 = $height / 2 + $y * $INCH / 10;
+    $g->appendChild(LINE(y1 => $y3, y2 => $y3, x1 => $x1, x2 => $x2, class => "stroke-non-repro-blue $class"));
+    if ($y) {
+        $g->appendChild(LINE(y1 => $y4, y2 => $y4, x1 => $x1, x2 => $x2, class => "stroke-non-repro-blue $class"));
+    }
+}
+
+$root->appendChild(RECT(@bounds, class => "stroke-red major"));
+
+print $doc->toString(2);

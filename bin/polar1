@@ -1,0 +1,80 @@
+#!/usr/bin/env perl
+use warnings;
+use strict;
+use XML::LibXML;
+use POSIX qw(round);
+use Math::Trig qw(pi);
+
+use FindBin;
+use lib "${FindBin::Bin}/../lib";
+use Paper qw(:all);
+
+# letter
+our $width = 8.5 * 96;
+our $height = 11 * 96;
+our $max_r = sqrt($width ** 2 + $height ** 2) / 2;
+
+my $doc = XML::LibXML::Document->new('1.0', 'UTF-8');
+my $viewbox = sprintf('%.3f %.3f %.3f %.3f', 0, 0, $width, $height);
+
+$Paper::doc = $doc;
+
+my $root = SVG(width => $width, height => $height, viewBox => $viewbox);
+$doc->setDocumentElement($root);
+
+my $clipPath = CLIP_PATH(id => "clipPath", RECT(x => 24, y => 24, width => $width - 2 * 24, height => $height - 2 * 24));
+$root->appendChild($clipPath);
+
+my $style = STYLE($PAPER_STYLES);
+$root->appendChild($style);
+
+my $g = G('clip-path' => 'url(#clipPath)');
+$root->appendChild($g);
+
+for (my $r = 8; $r <= $max_r; $r += 8) {
+    my $circle = CIRCLE(cx => $width / 2, cy => $height / 2, r => $r);
+    if ($r % 96 == 0) {
+        $circle->setAttribute('class', 'stroke-non-repro-blue major');
+    } elsif ($r % 24 == 0) {
+        $circle->setAttribute('class', 'stroke-non-repro-blue minor');
+    } else {
+        $circle->setAttribute('class', 'stroke-non-repro-blue feint');
+    }
+    $g->appendChild($circle);
+}
+
+for (my $theta = 0; $theta < 360; $theta += 0.5) {
+    my $r = 288;
+    my $class = 'stroke-non-repro-blue feint';
+    if (abs($theta - round($theta)) < 0.0001) {
+        $theta = round($theta);
+    }
+    if ($theta == round($theta)) {
+        if ($theta % 45 == 0) {
+            $r = 0;
+            $class = 'stroke-non-repro-blue major';
+        } elsif ($theta % 15 == 0) {
+            $r = 48;
+            $class = 'stroke-non-repro-blue major';
+        } elsif ($theta % 5 == 0) {
+            $r = 96;
+            $class = 'stroke-non-repro-blue minor';
+        } elsif ($theta == round($theta)) {
+            $r = 144;
+            $class = 'stroke-non-repro-blue minor';
+        } else {
+            $r = 192;
+            $class = 'stroke-non-repro-blue minor';
+        }
+    }
+    my $x1 = $width/2 + $r * sin($theta * pi / 180);
+    my $y1 = $height/2 + $r * cos($theta * pi / 180);
+    my $x2 = $width/2 + $max_r * sin($theta * pi / 180);
+    my $y2 = $height/2 + $max_r * cos($theta * pi / 180);
+    my $line = LINE(x1 => $x1, x2 => $x2, y1 => $y1, y2 => $y2, class => $class);
+    $g->appendChild($line);
+}
+
+$root->appendChild(RECT(x => 24, y => 24, width => $width - 2 * 24, height => $height - 2 * 24,
+                        class => "stroke-red major"));
+print $doc->toString(2);
